@@ -1,12 +1,11 @@
 import fetch from 'node-fetch';
-import { alpha_vantage } from './apikey.js';
-
+import { apiKeys } from './config.js';
 
 export default class TickerService {
 
     constructor(ticker){
         this.ticker = ticker;
-        this.baseUrl = `https://www.alphavantage.co/query?apikey=${alpha_vantage}&symbol=${ticker}&function=`;
+        this.baseUrl = `https://www.alphavantage.co/query?apikey=${apiKeys.av}&symbol=${ticker}&function=`;
     }
 
     testDates(){
@@ -46,7 +45,8 @@ export default class TickerService {
 
     async lastClosePrice() {
         //FIXME: need to consider previous day if before today's close
-        let date = latestDate(new Date());
+        //do not need to consider local time
+        let date = this.latestDate(new Date());
         const func = "TIME_SERIES_DAILY"
         let url = this.baseUrl + func
         try {
@@ -54,13 +54,22 @@ export default class TickerService {
             //console.log(`response status: ${response.status} /${response.ok}`)
             if (!response.ok){
                 throw new HTTPResponseError(response);
+                //throw new Error(`Request failed with status ${response.status}`)
             }
             const data = await response.json();
             //console.log(`close: ${data["Time Series (Daily)"][date]["4. close"]}`);
-            return {close: data["Time Series (Daily)"][date]["4. close"]};
+            if (data["Time Series (Daily)"][date] == undefined){
+                throw new RangeError  //TODO: no date, use day before
+            }
+            return {close: data["Time Series (Daily)"][date]["4. close"]};  
         }
         catch (err){
-            console.error(err);
+            if (err instanceof RangeError){
+                console.log(`DATE ${date} does not exist.`);
+            }
+            else {
+                console.error(err);
+            }
         }
     }
 
@@ -160,7 +169,7 @@ export default class TickerService {
 
     latestDate(d){
         let day = d.getDay();
-        let date = d.getDate();
+        let date = d.getDate();  //gets local date
         let month = d.getMonth() + 1;
         let year = d.getFullYear();
 
