@@ -43,10 +43,8 @@ export default class TickerService {
         .then((data) => { console.log(JSON.stringify(data))});
     }
 
-    async lastClosePrice() {
-        //FIXME: need to consider previous day if before today's close
-        //do not need to consider local time
-        let date = this.latestDate(new Date());
+    async lastClosePrice(d) {
+        let date = this.latestDate(d);
         const func = "TIME_SERIES_DAILY"
         let url = this.baseUrl + func
         try {
@@ -59,7 +57,7 @@ export default class TickerService {
             const data = await response.json();
             //console.log(`close: ${data["Time Series (Daily)"][date]["4. close"]}`);
             if (data["Time Series (Daily)"][date] == undefined){
-                throw new RangeError  //TODO: no date, use day before
+                throw new RangeError
             }
             return {close: data["Time Series (Daily)"][date]["4. close"]};  
         }
@@ -168,11 +166,17 @@ export default class TickerService {
     }
 
     latestDate(d){
+        //consider previous day if before today's close
+        if (`${d.getHours()<10?0:""}${d.getHours()}:${d.getMinutes()<10?0:""}${d.getMinutes()}` < '09:30'){
+            d.setDate(d.getDate() - 1);
+        }
+
         let day = d.getDay();
         let date = d.getDate();  //gets local date
         let month = d.getMonth() + 1;
         let year = d.getFullYear();
 
+        //remove weekends
         if (day == 6){
             date--;
         }
@@ -180,6 +184,7 @@ export default class TickerService {
             date = date - 2;
         }
 
+        //adjust date 
         if (date < 1){
             month--;
             if (month < 1){
@@ -221,6 +226,8 @@ export default class TickerService {
         if (month.length == 1){
             month = "0" + month;
         }
+
+        console.log(`***debugging: ${year}-${month}-${date}`);
 
         return `${year}-${month}-${date}`;
     }

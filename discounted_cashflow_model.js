@@ -3,8 +3,8 @@ import TickerService from './ticker_service.js';
 
 export default class DiscountedCashFlowModel {
 
-    #source;
     #ticker;
+    #source;
     #curDate;
     #closingPrice = 0.0;
     #marketCap = 0;
@@ -15,25 +15,32 @@ export default class DiscountedCashFlowModel {
     #totalDebt = 0;  //use total debt for WACC; use total debt and assets for debt ratio
     #interestExpense = 0;  //if nii>0, interest=0
     #freeCashflows = [];  //if fcf<0, fcf=0
+    #riskFreeRate;
+    #marketRate;
+    #terminalGrowthRate;
+    #marginOfSafety;
+    #durationYears;
 
-    constructor(ticker, source="AV"){
-        this.riskFreeRate = dcfModelConfig.riskFreeRate;
-        this.marketRate = dcfModelConfig.marketRate;
-        this.terminalGrowthRate = dcfModelConfig.terminalGrowthRate;
-        this.marginOfSafety = dcfModelConfig.marginOfSafety;
-        this.durationYears = dcfModelConfig.durationYears;
+    constructor(ticker, source="AV", date=new Date()){
+        this.#riskFreeRate = dcfModelConfig.riskFreeRate;
+        this.#marketRate = dcfModelConfig.marketRate;
+        this.#terminalGrowthRate = dcfModelConfig.terminalGrowthRate;
+        this.#marginOfSafety = dcfModelConfig.marginOfSafety;
+        this.#durationYears = dcfModelConfig.durationYears;
 
         this.#source = source;
         this.#ticker = ticker;
-        this.#curDate = new Date().toISOString().split("T")[0];
+        //this.#curDate = new Date().toISOString().split("T")[0];
+        this.#curDate = date;  //XXX: must be yyyy-mm-dd
+
 
         //call source
-        this.tickerData_AlphaVantage();
+        //await this.tickerData_AlphaVantage();
 
         //build model
         //...
 
-        //this.toString();
+        //console.log(this.toString());
     }
 
     get source(){
@@ -90,9 +97,9 @@ free cash flows:  ${this.freeCashflows.toString()}
     }
 
     async tickerData_AlphaVantage(){
-        const ticker = new TickerService(this.#ticker);
+        const ticker = new TickerService(this.ticker);
 
-        let data = await ticker.lastClosePrice();
+        let data = await ticker.lastClosePrice(this.curDate);
         this.#closingPrice = data.close;
 
         data = await ticker.shareAttributes();
@@ -111,7 +118,7 @@ free cash flows:  ${this.freeCashflows.toString()}
         data = await ticker.fromCashflowStmt();
         this.#freeCashflows = data;
 
-        this.toString();
+        console.log(this.toString());
     }
 
 }
