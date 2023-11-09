@@ -21,7 +21,7 @@ export default class DiscountedCashFlowModel {
     #marginOfSafety;
     #durationYears;
 
-    constructor(ticker, source="AV", date=new Date()){
+    constructor(ticker, source="AV", date=''){
         this.#riskFreeRate = dcfModelConfig.riskFreeRate;
         this.#marketRate = dcfModelConfig.marketRate;
         this.#terminalGrowthRate = dcfModelConfig.terminalGrowthRate;
@@ -30,9 +30,13 @@ export default class DiscountedCashFlowModel {
 
         this.#source = source;
         this.#ticker = ticker;
-        //this.#curDate = new Date().toISOString().split("T")[0];
-        this.#curDate = date;  //XXX: must be yyyy-mm-dd
 
+        if (date == ''){
+            this.#curDate = this.latestDate(new Date());             
+        }
+        else{  //XXX: date must be yyyy-mm-dd 
+            this.#curDate = this.latestDate(new Date(date + 'T09:31'));
+        }
 
         //call source
         //await this.tickerData_AlphaVantage();
@@ -79,6 +83,21 @@ export default class DiscountedCashFlowModel {
     get freeCashflows(){
         return this.#freeCashflows;
     }
+    get riskFreeRate(){
+        return this.#riskFreeRate;
+    }
+    get marketRate(){
+        return this.#marketRate;
+    }
+    get terminalGrowthRate(){
+        return this.#terminalGrowthRate;
+    }
+    get marginOfSafety(){
+        return this.#marginOfSafety;
+    }
+    get durationYears(){
+        return this.#durationYears;
+    }
 
     toString(){
         return `
@@ -93,7 +112,93 @@ income tax:       ${this.incomeTax}
 total debt:       ${this.totalDebt}
 interest expense: ${this.interestExpense}
 free cash flows:  ${this.freeCashflows.toString()}
+
+Global settings
+-----------------------------------------
+risk free rate:       ${this.riskFreeRate} (${(this.riskFreeRate * 100).toFixed(2)}%)
+market rate:          ${this.marketRate} (${(this.marketRate * 100).toFixed(2)}%)
+terminal growth rate: ${this.terminalGrowthRate} (${(this.terminalGrowthRate * 100).toFixed(2)}%)
+margin of safety:     ${this.marginOfSafety} (${(this.marginOfSafety * 100).toFixed(0)}%)
+duration years:       ${this.durationYears}
 `;
+    }
+
+    testDates(){
+        const dates = [new Date('2023-01-01T09:30'),new Date('2023-04-01T09:30'),new Date('2023-09-02T09:30'),new Date('2023-09-03T09:30'),new Date()];
+        for (let d in dates){
+            console.log(dates[d]);
+            let date = this.latestDate(dates[d]);
+            console.log(date);
+        }
+    }
+
+    latestDate(d){
+        //consider previous day if before today's close
+        if (`${d.getHours()<10?0:""}${d.getHours()}:${d.getMinutes()<10?0:""}${d.getMinutes()}` < '09:30'){
+            d.setDate(d.getDate() - 1);
+        }
+
+        let day = d.getDay();
+        let date = d.getDate();  //gets local date
+        let month = d.getMonth() + 1;
+        let year = d.getFullYear();
+
+        //remove weekends
+        if (day == 6){
+            date--;
+        }
+        else if (day == 0){
+            date = date - 2;
+        }
+
+        //adjust date 
+        if (date < 1){
+            month--;
+            if (month < 1){
+                month = 12;
+                year--
+            }
+
+            if ([1,3,5,7,8,10,12].indexOf(month) >= 0){
+                date = 31;
+            }
+            else if ([4,6,9,11].indexOf(month) >= 0){
+                date = 30;
+            }
+            else if (month == 2) {
+                //years 1700, 1800, and 1900 were not leap years 
+                //but the years 1600 and 2000 were
+                if (year % 4 == 0) {
+                    if (year % 100 == 0){
+                        if (year % 400 == 0){
+                            date = 29;  //leap year                   
+                        } else {
+                            date = 28;
+                        }
+                    } else {
+                        date = 29;  //leap year
+                    }
+                } else {
+                    date = 28;
+                }
+            }
+        }
+
+        //pad date
+        date = date.toString();
+        if (date.length == 1){
+            date = "0" + date;
+        }
+
+        //pad month
+        month = month.toString();
+        if (month.length == 1){
+            month = "0" + month;
+        }
+
+        console.log(`***debugging: ${year}-${month}-${date}`);
+
+        return `${year}-${month}-${date}`;
     }
 
     async tickerData_AlphaVantage(){

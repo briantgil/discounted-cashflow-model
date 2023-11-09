@@ -8,15 +8,6 @@ export default class TickerService {
         this.baseUrl = `https://www.alphavantage.co/query?apikey=${apiKeys.av}&symbol=${ticker}&function=`;
     }
 
-    testDates(){
-        const dates = [new Date('2023-01-01'),new Date('2023-04-01'),new Date('2023-09-02'),new Date('2023-09-03'),new Date()];
-        for (let d in dates){
-            console.log(dates[d]);
-            let date = this.latestDate(dates[d]);
-            console.log(date);
-        }
-    }
-
     testMain(){
 
         // (async() => {
@@ -27,7 +18,7 @@ export default class TickerService {
         //     console.log(JSON.stringify(await fromCashflowStmt()));
         // })()
 
-        this.lastClosePrice()
+        this.lastClosePrice(new Date())
         .then((data) => { console.log(JSON.stringify(data))});
 
         this.shareAttributes()
@@ -43,8 +34,7 @@ export default class TickerService {
         .then((data) => { console.log(JSON.stringify(data))});
     }
 
-    async lastClosePrice(d) {
-        let date = this.latestDate(d);
+    async lastClosePrice(date) {
         const func = "TIME_SERIES_DAILY"
         let url = this.baseUrl + func
         try {
@@ -163,73 +153,6 @@ export default class TickerService {
         catch (err){
             console.error(err);
         }
-    }
-
-    latestDate(d){
-        //consider previous day if before today's close
-        if (`${d.getHours()<10?0:""}${d.getHours()}:${d.getMinutes()<10?0:""}${d.getMinutes()}` < '09:30'){
-            d.setDate(d.getDate() - 1);
-        }
-
-        let day = d.getDay();
-        let date = d.getDate();  //gets local date
-        let month = d.getMonth() + 1;
-        let year = d.getFullYear();
-
-        //remove weekends
-        if (day == 6){
-            date--;
-        }
-        else if (day == 0){
-            date = date - 2;
-        }
-
-        //adjust date 
-        if (date < 1){
-            month--;
-            if (month < 1){
-                month = 12;
-                year--
-            }
-
-            if ([1,3,5,7,8,10,12].indexOf(month) >= 0){
-                date = 31;
-            }
-            else if ([4,6,9,11].indexOf(month) >= 0){
-                date = 30;
-            }
-            else if (month == 2) {
-                //years 1700, 1800, and 1900 were not leap years 
-                //but the years 1600 and 2000 were
-                if (year % 4 == 0) {
-                    if (year % 100 == 0){
-                        if (year % 400 == 0){
-                            date = 29;  //leap year                   
-                        } else {
-                            date = 28;
-                        }
-                    } else {
-                        date = 29;  //leap year
-                    }
-                } else {
-                    date = 28;
-                }
-            }
-        }
-
-        date = date.toString();
-        if (date.length == 1){
-            date = "0" + date;
-        }
-
-        month = month.toString();
-        if (month.length == 1){
-            month = "0" + month;
-        }
-
-        console.log(`***debugging: ${year}-${month}-${date}`);
-
-        return `${year}-${month}-${date}`;
     }
 
 }
