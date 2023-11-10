@@ -3,25 +3,36 @@ import TickerService from './ticker_service.js';
 
 export default class DiscountedCashFlowModel {
 
+    /**
+     * globals
+     */
+     #riskFreeRate;
+     #marketRate;
+     #terminalGrowthRate;
+     #marginOfSafety;
+     #durationYears;
+
+    /**
+     * params
+     */
     #ticker;
     #source;
     #curDate;
+
+    /**
+     * fetched
+     */
     #closingPrice = 0.0;
     #marketCap = 0;
-    #outstandingShares = 0;  
+    #sharesOutstanding = 0;  
     #beta = 0.0;
     #pretaxIncome = 0;  //if income<0, income=0
     #incomeTax = 0;  //if tax<0, tax=0
     #totalDebt = 0;  //use total debt for WACC; use total debt and assets for debt ratio
     #interestExpense = 0;  //if nii>0, interest=0
     #freeCashflows = [];  //if fcf<0, fcf=0
-    #riskFreeRate;
-    #marketRate;
-    #terminalGrowthRate;
-    #marginOfSafety;
-    #durationYears;
 
-    constructor(ticker, source="AV", date=''){
+    constructor(ticker, source="AlphaVantage", date=''){
         this.#riskFreeRate = dcfModelConfig.riskFreeRate;
         this.#marketRate = dcfModelConfig.marketRate;
         this.#terminalGrowthRate = dcfModelConfig.terminalGrowthRate;
@@ -32,10 +43,10 @@ export default class DiscountedCashFlowModel {
         this.#ticker = ticker;
 
         if (date == ''){
-            this.#curDate = this.latestDate(new Date());             
+            this.#curDate = this.#latestDate(new Date());             
         }
         else{  //XXX: date must be yyyy-mm-dd 
-            this.#curDate = this.latestDate(new Date(date + 'T09:31'));
+            this.#curDate = this.#latestDate(new Date(date + 'T09:31'));
         }
 
         //call source
@@ -62,8 +73,8 @@ export default class DiscountedCashFlowModel {
     get marketCap(){
         return this.#marketCap;
     }
-    get outstandingShares(){
-        return this.#outstandingShares;
+    get sharesOutstanding(){
+        return this.#sharesOutstanding;
     }    
     get beta(){
         return this.#beta;
@@ -101,18 +112,6 @@ export default class DiscountedCashFlowModel {
 
     toString(){
         return `
-${this.ticker} (source: ${this.source}, ${this.curDate})
------------------------------------------
-last close:       ${this.closingPrice}
-market cap:       ${this.marketCap}
-shares out:       ${this.outstandingShares}
-beta:             ${this.beta}
-pretax income:    ${this.pretaxIncome}
-income tax:       ${this.incomeTax}
-total debt:       ${this.totalDebt}
-interest expense: ${this.interestExpense}
-free cash flows:  ${this.freeCashflows.toString()}
-
 Global settings
 -----------------------------------------
 risk free rate:       ${this.riskFreeRate} (${(this.riskFreeRate * 100).toFixed(2)}%)
@@ -120,6 +119,18 @@ market rate:          ${this.marketRate} (${(this.marketRate * 100).toFixed(2)}%
 terminal growth rate: ${this.terminalGrowthRate} (${(this.terminalGrowthRate * 100).toFixed(2)}%)
 margin of safety:     ${this.marginOfSafety} (${(this.marginOfSafety * 100).toFixed(0)}%)
 duration years:       ${this.durationYears}
+
+${this.ticker} (source: ${this.source}, ${this.curDate})
+-----------------------------------------
+last close:       ${this.closingPrice}
+market cap:       ${this.marketCap}
+shares:           ${this.sharesOutstanding}
+beta:             ${this.beta}
+pretax income:    ${this.pretaxIncome}
+income tax:       ${this.incomeTax}
+total debt:       ${this.totalDebt}
+interest expense: ${this.interestExpense}
+free cash flows:  ${this.freeCashflows.toString()}
 `;
     }
 
@@ -127,12 +138,12 @@ duration years:       ${this.durationYears}
         const dates = [new Date('2023-01-01T09:30'),new Date('2023-04-01T09:30'),new Date('2023-09-02T09:30'),new Date('2023-09-03T09:30'),new Date()];
         for (let d in dates){
             console.log(dates[d]);
-            let date = this.latestDate(dates[d]);
+            let date = this.#latestDate(dates[d]);
             console.log(date);
         }
     }
 
-    latestDate(d){
+    #latestDate(d){
         //consider previous day if before today's close
         if (`${d.getHours()<10?0:""}${d.getHours()}:${d.getMinutes()<10?0:""}${d.getMinutes()}` < '09:30'){
             d.setDate(d.getDate() - 1);
@@ -209,7 +220,7 @@ duration years:       ${this.durationYears}
 
         data = await ticker.shareAttributes();
         this.#marketCap = parseInt(data["market cap"]);
-        this.#outstandingShares = parseInt(data.shares);
+        this.#sharesOutstanding = parseInt(data.shares);
         this.#beta = parseFloat(data.beta);        
 
         data = await ticker.fromIncomeStmt();
