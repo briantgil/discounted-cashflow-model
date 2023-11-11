@@ -4,7 +4,7 @@ import TickerService from './ticker_service.js';
 export default class DiscountedCashFlowModel {
 
     /**
-     * globals
+     * global configs
      */
      #riskFreeRate;
      #marketRate;
@@ -13,14 +13,14 @@ export default class DiscountedCashFlowModel {
      #durationYears;
 
     /**
-     * params
+     * passed params
      */
     #ticker;
     #source;
     #curDate;
 
     /**
-     * fetched
+     * fetched via REST API
      */
     #closingPrice = 0.0;
     #marketCap = 0;
@@ -31,6 +31,10 @@ export default class DiscountedCashFlowModel {
     #totalDebt = 0;  //use total debt for WACC; use total debt and assets for debt ratio
     #interestExpense = 0;  //if nii>0, interest=0
     #freeCashflows = [];  //if fcf<0, fcf=0
+
+    //TODO: 
+    //cast and check types
+    //validate parameters
 
     constructor(ticker, source="AlphaVantage", date=''){
         this.#riskFreeRate = dcfModelConfig.riskFreeRate;
@@ -43,7 +47,7 @@ export default class DiscountedCashFlowModel {
         this.#ticker = ticker;
 
         if (date == ''){
-            this.#curDate = this.#latestDate(new Date());             
+            this.#curDate = this.#latestDate(new Date());  //default date      
         }
         else{  //XXX: date must be yyyy-mm-dd 
             this.#curDate = this.#latestDate(new Date(date + 'T09:31'));
@@ -207,8 +211,7 @@ free cash flows:  ${this.freeCashflows.toString()}
             month = "0" + month;
         }
 
-        console.log(`***debugging: ${year}-${month}-${date}`);
-
+        //console.log(`***debugging: ${year}-${month}-${date}`);
         return `${year}-${month}-${date}`;
     }
 
