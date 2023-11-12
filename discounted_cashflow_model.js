@@ -53,13 +53,6 @@ export default class DiscountedCashFlowModel {
             this.#curDate = this.#latestDate(new Date(date + 'T09:31'));
         }
 
-        //call source
-        //await this.tickerData_AlphaVantage();
-
-        //build model
-        //...
-
-        //console.log(this.toString());
     }
 
     get source(){
@@ -215,28 +208,60 @@ free cash flows:  ${this.freeCashflows.toString()}
         return `${year}-${month}-${date}`;
     }
 
-    async tickerData_AlphaVantage(){
+    async #tickerData_AlphaVantage(){
         const ticker = new TickerService(this.ticker);
 
+        /*
         let data = await ticker.lastClosePrice(this.curDate);
         this.#closingPrice = data.close;
-
         data = await ticker.shareAttributes();
         this.#marketCap = parseInt(data["market cap"]);
         this.#sharesOutstanding = parseInt(data.shares);
         this.#beta = parseFloat(data.beta);        
-
         data = await ticker.fromIncomeStmt();
         this.#pretaxIncome = parseInt(data["pretax income"]);
         this.#incomeTax = parseInt(data["income tax"]);
         this.#interestExpense = parseInt(data["interest expense"]);
-
         data = await ticker.fromBalSheet();
         this.#totalDebt = parseInt(data["total debt"]);
-
         data = await ticker.fromCashflowStmt();
         this.#freeCashflows = data;
+        */
 
+        const data = await Promise.all([
+            ticker.lastClosePrice(this.curDate),
+            ticker.shareAttributes(),
+            ticker.fromIncomeStmt(),
+            ticker.fromBalSheet(),
+            ticker.fromCashflowStmt()
+        ]);
+
+        //func 1
+        this.#closingPrice = data[0].close;
+        //func 2
+        this.#marketCap = parseInt(data[1]["market cap"]);
+        this.#sharesOutstanding = parseInt(data[1].shares);
+        this.#beta = parseFloat(data[1].beta);   
+        //func 3
+        this.#pretaxIncome = parseInt(data[2]["pretax income"]);
+        this.#incomeTax = parseInt(data[2]["income tax"]);
+        this.#interestExpense = parseInt(data[2]["interest expense"]);
+        //func 4
+        this.#totalDebt = parseInt(data[3]["total debt"]);
+        //func 5
+        this.#freeCashflows = data[4];
+    }
+
+    async fetchData(){
+        switch (this.source){
+            case 'file':
+            case 'Polygon':
+            case 'AlphaVantage':
+                await this.#tickerData_AlphaVantage(this.ticker);
+                break;
+            default:
+                await this.#tickerData_AlphaVantage(this.ticker);
+        }
         console.log(this.toString());
     }
 
