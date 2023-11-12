@@ -20,7 +20,7 @@ export default class DiscountedCashFlowModel {
     #curDate;
 
     /**
-     * fetched via REST API
+     * fetched data
      */
     #closingPrice = 0.0;
     #marketCap = 0;
@@ -55,11 +55,26 @@ export default class DiscountedCashFlowModel {
 
     }
 
-    get source(){
-        return this.#source;
+    get riskFreeRate(){
+        return this.#riskFreeRate;
     }
+    get marketRate(){
+        return this.#marketRate;
+    }
+    get terminalGrowthRate(){
+        return this.#terminalGrowthRate;
+    }
+    get marginOfSafety(){
+        return this.#marginOfSafety;
+    }
+    get durationYears(){
+        return this.#durationYears;
+    }    
     get ticker(){
         return this.#ticker;
+    }    
+    get source(){
+        return this.#source;
     }
     get curDate(){
         return this.#curDate;
@@ -91,21 +106,7 @@ export default class DiscountedCashFlowModel {
     get freeCashflows(){
         return this.#freeCashflows;
     }
-    get riskFreeRate(){
-        return this.#riskFreeRate;
-    }
-    get marketRate(){
-        return this.#marketRate;
-    }
-    get terminalGrowthRate(){
-        return this.#terminalGrowthRate;
-    }
-    get marginOfSafety(){
-        return this.#marginOfSafety;
-    }
-    get durationYears(){
-        return this.#durationYears;
-    }
+
 
     toString(){
         return `
@@ -208,10 +209,23 @@ free cash flows:  ${this.freeCashflows.toString()}
         return `${year}-${month}-${date}`;
     }
 
+    async fetchData(){
+        switch (this.source){
+            case 'file':
+            case 'Polygon':
+            case 'AlphaVantage':
+                await this.#tickerData_AlphaVantage(this.ticker);
+                break;
+            default:
+                await this.#tickerData_AlphaVantage(this.ticker);
+        }
+        console.log(this.toString());
+    }    
+
     async #tickerData_AlphaVantage(){
         const ticker = new TickerService(this.ticker);
 
-        /*
+        /*sequential fetch data calls
         let data = await ticker.lastClosePrice(this.curDate);
         this.#closingPrice = data.close;
         data = await ticker.shareAttributes();
@@ -250,19 +264,6 @@ free cash flows:  ${this.freeCashflows.toString()}
         this.#totalDebt = parseInt(data[3]["total debt"]);
         //func 5
         this.#freeCashflows = data[4];
-    }
-
-    async fetchData(){
-        switch (this.source){
-            case 'file':
-            case 'Polygon':
-            case 'AlphaVantage':
-                await this.#tickerData_AlphaVantage(this.ticker);
-                break;
-            default:
-                await this.#tickerData_AlphaVantage(this.ticker);
-        }
-        console.log(this.toString());
     }
 
 }

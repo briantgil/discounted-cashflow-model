@@ -5,7 +5,5 @@ const dcfm = new DiscountedCashFlowModel("NVDA");
 //const dcfm = new DiscountedCashFlowModel("NVDA", undefined, new Date('2023-11-03T09:30'));
 
 
-//await dcfm.tickerData_AlphaVantage();
-//console.log(dcfm.toString());
 await dcfm.fetchData();
-//console.log(dcfm.toString());
+
