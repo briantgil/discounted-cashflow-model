@@ -45,8 +45,8 @@ export default class DiscountedCashFlowModel {
     /**
      * calculated data
      */
-    #freeCashflowsGrowth = [];
-    #avg_fcf_growth = 0;
+    #fcfGrowthRates = [];
+    #avgFcfGrowthRate = 0;
 
     //TODO: 
     //cast and check types
@@ -123,11 +123,11 @@ export default class DiscountedCashFlowModel {
         return this.#freeCashflows;
     }
 
-    get avg_fcf_growth(){
-        if (this.#freeCashflowsGrowth.length > 0){
-            this.#avg_fcf_growth = this.#freeCashflowsGrowth.reduce((curTotal, curVal)=>curTotal+curVal) / this.#freeCashflows.length * 100; 
+    get avgFcfGrowthRate(){
+        if (this.#fcfGrowthRates.length > 0){
+            this.#avgFcfGrowthRate = this.#fcfGrowthRates.reduce((curTotal, curVal)=>curTotal+curVal) / this.#freeCashflows.length * 100; 
         }
-        return this.#avg_fcf_growth;
+        return this.#avgFcfGrowthRate;
     }
 
     toString(){
@@ -151,7 +151,7 @@ income tax:         ${this.incomeTax}
 total debt:         ${this.totalDebt}
 interest expense:   ${this.interestExpense}
 free cash flows:    ${this.freeCashflows.toString()}
-average fcf growth: ${this.avg_fcf_growth}
+average fcf growth: ${this.avgFcfGrowthRate}
 `;
     }
 
@@ -251,16 +251,20 @@ average fcf growth: ${this.avg_fcf_growth}
         /*sequential fetch data calls
         let data = await ticker.lastClosePrice(this.curDate);
         this.#closingPrice = data.close;
+
         data = await ticker.shareAttributes();
         this.#marketCap = parseInt(data["market cap"]);
         this.#sharesOutstanding = parseInt(data.shares);
         this.#beta = parseFloat(data.beta);        
+
         data = await ticker.fromIncomeStmt();
         this.#pretaxIncome = parseInt(data["pretax income"]);
         this.#incomeTax = parseInt(data["income tax"]);
         this.#interestExpense = parseInt(data["interest expense"]);
+
         data = await ticker.fromBalSheet();
         this.#totalDebt = parseInt(data["total debt"]);
+
         data = await ticker.fromCashflowStmt();
         this.#freeCashflows = data;
         */
@@ -280,13 +284,13 @@ average fcf growth: ${this.avg_fcf_growth}
         this.#sharesOutstanding = parseInt(data[1].shares);
         this.#beta = parseFloat(data[1].beta);   
         //func 3
-        this.#pretaxIncome = parseInt(data[2]["pretax income"]);
-        this.#incomeTax = parseInt(data[2]["income tax"]);
-        this.#interestExpense = parseInt(data[2]["interest expense"]);
+        this.#pretaxIncome = parseInt(data[2]["pretax income"]) > 0 ? parseInt(data[2]["pretax income"]) : 0;
+        this.#incomeTax = parseInt(data[2]["income tax"]) > 0 ? parseInt(data[2]["income tax"]) : 0;
+        this.#interestExpense = parseInt(data[2]["interest expense"]) > 0 ? parseInt(data[2]["interest expense"]) : 0;
         //func 4
         this.#totalDebt = parseInt(data[3]["total debt"]);
         //func 5
-        this.#freeCashflows = data[4];
+        this.#freeCashflows = data[4].map(val => parseInt(val) > 0 ? parseInt(val) : 0);
     }
 
 }
