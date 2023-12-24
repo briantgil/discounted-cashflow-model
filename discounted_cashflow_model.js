@@ -2,6 +2,16 @@ import { dcfModelConfig } from './config.js';
 import TickerService from './ticker_service.js';
 
 export default class DiscountedCashFlowModel {
+    /*
+    Discounted Cash Flow (DCF) model
+    Calculate Fair Value of a Company Security using Discounted Free Cash Flow
+    references:
+    https://www.investopedia.com/terms/d/dcf.asp#:~:text=Discounted%20cash%20flow%20(DCF)%20refers,will%20generate%20in%20the%20future.
+    https://www.investopedia.com/terms/w/wacc.asp
+    https://www.investopedia.com/terms/c/costofequity.asp
+    https://www.investopedia.com/terms/c/capm.asp
+    https://www.investopedia.com/terms/t/terminalvalue.asp
+    */
 
     /**
      * global configs
@@ -31,6 +41,12 @@ export default class DiscountedCashFlowModel {
     #totalDebt = 0;  //use total debt for WACC; use total debt and assets for debt ratio
     #interestExpense = 0;  //if nii>0, interest=0
     #freeCashflows = [];  //if fcf<0, fcf=0
+
+    /**
+     * calculated data
+     */
+    #freeCashflowsGrowth = [];
+    #avg_fcf_growth = 0;
 
     //TODO: 
     //cast and check types
@@ -107,6 +123,12 @@ export default class DiscountedCashFlowModel {
         return this.#freeCashflows;
     }
 
+    get avg_fcf_growth(){
+        if (this.#freeCashflowsGrowth.length > 0){
+            this.#avg_fcf_growth = this.#freeCashflowsGrowth.reduce((curTotal, curVal)=>curTotal+curVal) / this.#freeCashflows.length * 100; 
+        }
+        return this.#avg_fcf_growth;
+    }
 
     toString(){
         return `
@@ -120,15 +142,16 @@ duration years:       ${this.durationYears}
 
 ${this.ticker} (source: ${this.source}, ${this.curDate})
 -----------------------------------------
-last close:       ${this.closingPrice}
-market cap:       ${this.marketCap}
-shares:           ${this.sharesOutstanding}
-beta:             ${this.beta}
-pretax income:    ${this.pretaxIncome}
-income tax:       ${this.incomeTax}
-total debt:       ${this.totalDebt}
-interest expense: ${this.interestExpense}
-free cash flows:  ${this.freeCashflows.toString()}
+last close:         ${this.closingPrice}
+market cap:         ${this.marketCap}
+shares:             ${this.sharesOutstanding}
+beta:               ${this.beta}
+pretax income:      ${this.pretaxIncome}
+income tax:         ${this.incomeTax}
+total debt:         ${this.totalDebt}
+interest expense:   ${this.interestExpense}
+free cash flows:    ${this.freeCashflows.toString()}
+average fcf growth: ${this.avg_fcf_growth}
 `;
     }
 
