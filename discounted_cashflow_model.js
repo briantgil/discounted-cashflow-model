@@ -1,4 +1,4 @@
-import { dcfModelConfig } from './config.js';
+import { dcfModelConfig, apiKeys } from './config.js';
 import TickerService from './ticker_service.js';
 
 export default class DiscountedCashFlowModel {
@@ -40,13 +40,24 @@ export default class DiscountedCashFlowModel {
     #incomeTax = 0;  //if tax<0, tax=0
     #totalDebt = 0;  //use total debt for WACC; use total debt and assets for debt ratio
     #interestExpense = 0;  //if nii>0, interest=0
-    #freeCashflows = [];  //if fcf<0, fcf=0
+    #freeCashflows = [];  //if fcf<0, fcf=0; order: newest -> oldest; fcf=operating cash flow-capex (premises, equipment, and leased equipment)
 
     /**
      * calculated data
      */
     #fcfGrowthRates = [];
-    #avgFcfGrowthRate = 0;
+    #avgFcfGrowthRate = 0.0;
+
+    #taxRate = 0.0;
+    #costOfDebt = 0.0;
+    #costOfEquity = 0.0;  //capital asset pricing model (capm)
+    #discountRate = 0.0  //weighted average cost of capital (wacc)
+    #terminalValue = 0.0  //perpetual growth model (pgm), perpetuity method
+    #futureFcf = [];
+    #discountFactors = [];  //for net present value (npv)
+    #discountedFcf = [];
+    #fairValue = 0.0;
+    #fvAfterMarginOfSafety = 0.0;
 
     //TODO: 
     //cast and check types
@@ -123,11 +134,32 @@ export default class DiscountedCashFlowModel {
         return this.#freeCashflows;
     }
 
-    get avgFcfGrowthRate(){
-        if (this.#fcfGrowthRates.length > 0){
-            this.#avgFcfGrowthRate = this.#fcfGrowthRates.reduce((curTotal, curVal)=>curTotal+curVal) / this.#freeCashflows.length * 100; 
+    
+    get fcfGrowthRates(){
+        //([i]-[i+1])/[i+1], if [i+1] == 0, then 0
+
+        const growthRates = [];
+
+        if (this.freeCashflows.length <= 1){
+            return [0];
         }
-        return this.#avgFcfGrowthRate;
+
+        for (let i=0; i<this.freeCashflows.length-1; i++){
+            if (this.freeCashflows[i+1] == 0){
+                growthRates.push(0);
+                continue;
+            }
+            growthRates.push((this.freeCashflows[i] - this.freeCashflows[i+1]) / this.freeCashflows[i+1]);
+        }
+
+        return growthRates;
+    }
+
+    get avgFcfGrowthRate(){
+        if (this.fcfGrowthRates.length > 0){
+            return this.fcfGrowthRates.reduce((curTotal, curVal)=>curTotal+curVal) / this.freeCashflows.length * 100; 
+        }
+        return 0;
     }
 
     toString(){
@@ -151,12 +183,14 @@ income tax:         ${this.incomeTax}
 total debt:         ${this.totalDebt}
 interest expense:   ${this.interestExpense}
 free cash flows:    ${this.freeCashflows.toString()}
-average fcf growth: ${this.avgFcfGrowthRate}
+FCF growth rates:   ${this.fcfGrowthRates.toString()}
+average fcf growth: ${this.avgFcfGrowthRate}%
 `;
     }
 
     testDates(){
         const dates = [new Date('2023-01-01T09:30'),new Date('2023-04-01T09:30'),new Date('2023-09-02T09:30'),new Date('2023-09-03T09:30'),new Date()];
+        //FIXME: does not work on holiday: 2023-12-25
         for (let d in dates){
             console.log(dates[d]);
             let date = this.#latestDate(dates[d]);
@@ -237,10 +271,10 @@ average fcf growth: ${this.avgFcfGrowthRate}
             case 'file':
             case 'Polygon':
             case 'AlphaVantage':
-                await this.#tickerData_AlphaVantage(this.ticker);
+                await this.#tickerData_AlphaVantage(this.ticker, apiKeys.av);
                 break;
             default:
-                await this.#tickerData_AlphaVantage(this.ticker);
+                await this.#tickerData_AlphaVantage(this.ticker, apiKeys.av);
         }
         console.log(this.toString());
     }    
@@ -290,7 +324,7 @@ average fcf growth: ${this.avgFcfGrowthRate}
         //func 4
         this.#totalDebt = parseInt(data[3]["total debt"]);
         //func 5
-        this.#freeCashflows = data[4].map(val => parseInt(val) > 0 ? parseInt(val) : 0);
+        this.#freeCashflows = data[4].map(val => parseInt(val) > 0 ? parseInt(val) : 0);  //XXX: may cause div/0
     }
 
 }

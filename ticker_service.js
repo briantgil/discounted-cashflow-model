@@ -3,9 +3,9 @@ import { apiKeys } from './config.js';
 
 export default class TickerService {
 
-    constructor(ticker){
+    constructor(ticker, apiKey){
         this.ticker = ticker;
-        this.baseUrl = `https://www.alphavantage.co/query?apikey=${apiKeys.av}&symbol=${ticker}&function=`;
+        this.baseUrl = `https://www.alphavantage.co/query?apikey=${apiKey}&symbol=${ticker}&function=`;
     }
 
     testMain(){
