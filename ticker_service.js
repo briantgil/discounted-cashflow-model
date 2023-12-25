@@ -1,5 +1,5 @@
 import fetch from 'node-fetch';
-import { apiKeys } from './config.js';
+//import { apiKeys } from './config.js';
 
 export default class TickerService {
 
