@@ -6,7 +6,7 @@ const apiKeys = {
 }
 
 const dcfModelConfig = {
-                    riskFreeRate:0.04431, //5yr ust; source: cnbc 
+                    riskFreeRate:0.03854, //5yr ust; source: cnbc 
                     marketRate:0.0796, //s&p 500; source: investopedia
                     terminalGrowthRate:0.0293, //gdp; source: world bank 
                     marginOfSafety:0.30,

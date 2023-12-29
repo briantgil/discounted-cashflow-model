@@ -59,26 +59,29 @@ export default class DiscountedCashFlowModel {
     #fairValue = 0.0;
     #fvAfterMarginOfSafety = 0.0;
 
-    //TODO: 
-    //cast and check types
-    //validate parameters
-
+    /**
+     * 
+     * @param {string} ticker 
+     * @param {string} source 
+     * @param {string} date 
+     */
     constructor(ticker, source="AlphaVantage", date=''){
         this.#riskFreeRate = dcfModelConfig.riskFreeRate;
         this.#marketRate = dcfModelConfig.marketRate;
         this.#terminalGrowthRate = dcfModelConfig.terminalGrowthRate;
         this.#marginOfSafety = dcfModelConfig.marginOfSafety;
         this.#durationYears = dcfModelConfig.durationYears;
-
-        this.#source = source;
         this.#ticker = ticker;
+        this.#source = source;
 
         if (date == ''){
             this.#curDate = this.#latestDate(new Date());  //default date      
         }
         else{  //XXX: date must be yyyy-mm-dd 
             this.#curDate = this.#latestDate(new Date(date + 'T09:31'));
-        }
+        }  //https://www.npmjs.com/package/date-holidays#holiday-object
+
+        //TODO: validate params
 
     }
 
@@ -134,32 +137,39 @@ export default class DiscountedCashFlowModel {
         return this.#freeCashflows;
     }
 
-    
     get fcfGrowthRates(){
-        //([i]-[i+1])/[i+1], if [i+1] == 0, then 0
+        //([i]-[i+1])/[i+1], if [i+1] == 0, then [i]
 
-        const growthRates = [];
-
-        if (this.freeCashflows.length <= 1){
-            return [0];
+        if (this.freeCashflows.length <= 0){
+            return [0.0];
+        }
+        else if (this.freeCashflows.length == 1 && this.freeCashflows[0] <= 0) {
+            return [0.0];
+        }
+        else if (this.freeCashflows.length == 1 && this.freeCashflows[0] > 0){
+            return [1.0];
         }
 
+        const growthRates = [];
         for (let i=0; i<this.freeCashflows.length-1; i++){
-            if (this.freeCashflows[i+1] == 0){
-                growthRates.push(0);
+            if (this.freeCashflows[i] <= 0 && this.freeCashflows[i+1] <= 0){  //XXX: rethink algo; see ticker BA
+                growthRates.push(0.0);
                 continue;
+            }
+            else if (this.freeCashflows[i] > 0 && this.freeCashflows[i+1] <= 0) {
+                growthRates.push(1.0);
+                continue;                
             }
             growthRates.push((this.freeCashflows[i] - this.freeCashflows[i+1]) / this.freeCashflows[i+1]);
         }
-
         return growthRates;
     }
 
     get avgFcfGrowthRate(){
         if (this.fcfGrowthRates.length > 0){
-            return this.fcfGrowthRates.reduce((curTotal, curVal)=>curTotal+curVal) / this.freeCashflows.length * 100; 
+            return this.fcfGrowthRates.reduce((curTotal, curVal)=>curTotal+curVal) / this.fcfGrowthRates.length * 100; 
         }
-        return 0;
+        return 0.0;
     }
 
     toString(){
@@ -191,6 +201,7 @@ average fcf growth: ${this.avgFcfGrowthRate}%
     testDates(){
         const dates = [new Date('2023-01-01T09:30'),new Date('2023-04-01T09:30'),new Date('2023-09-02T09:30'),new Date('2023-09-03T09:30'),new Date()];
         //FIXME: does not work on holiday: 2023-12-25
+        //https://www.npmjs.com/package/date-holidays#holiday-object
         for (let d in dates){
             console.log(dates[d]);
             let date = this.#latestDate(dates[d]);
@@ -202,7 +213,7 @@ average fcf growth: ${this.avgFcfGrowthRate}%
         //consider previous day if before today's close
         if (`${d.getHours()<10?0:""}${d.getHours()}:${d.getMinutes()<10?0:""}${d.getMinutes()}` < '09:30'){
             d.setDate(d.getDate() - 1);
-        }
+        }  
 
         let day = d.getDay();
         let date = d.getDate();  //gets local date
@@ -279,8 +290,8 @@ average fcf growth: ${this.avgFcfGrowthRate}%
         console.log(this.toString());
     }    
 
-    async #tickerData_AlphaVantage(){
-        const ticker = new TickerService(this.ticker);
+    async #tickerData_AlphaVantage(ticker, apikey){
+        const tickerSymbol = new TickerService(ticker, apikey);
 
         /*sequential fetch data calls
         let data = await ticker.lastClosePrice(this.curDate);
@@ -304,11 +315,11 @@ average fcf growth: ${this.avgFcfGrowthRate}%
         */
 
         const data = await Promise.all([
-            ticker.lastClosePrice(this.curDate),
-            ticker.shareAttributes(),
-            ticker.fromIncomeStmt(),
-            ticker.fromBalSheet(),
-            ticker.fromCashflowStmt()
+            tickerSymbol.lastClosePrice(this.curDate),
+            tickerSymbol.shareAttributes(),
+            tickerSymbol.fromIncomeStmt(),
+            tickerSymbol.fromBalSheet(),
+            tickerSymbol.fromCashflowStmt()
         ]);
 
         //func 1
@@ -324,7 +335,7 @@ average fcf growth: ${this.avgFcfGrowthRate}%
         //func 4
         this.#totalDebt = parseInt(data[3]["total debt"]);
         //func 5
-        this.#freeCashflows = data[4].map(val => parseInt(val) > 0 ? parseInt(val) : 0);  //XXX: may cause div/0
+        this.#freeCashflows = data[4].map(val => parseInt(val) > 0 ? parseInt(val) : 0);  //XXX: remove negatives; may cause div/0
     }
 
 }

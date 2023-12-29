@@ -1,5 +1,4 @@
 import fetch from 'node-fetch';
-//import { apiKeys } from './config.js';
 
 export default class TickerService {
 
@@ -141,6 +140,7 @@ export default class TickerService {
             }
             const data = await response.json();
             const reports = data["annualReports"];  //"should" be 5 years of reports
+            //const reports = data["quarterlyReports"];  //"should" be 20 quarters of reports
             for (let i=0;i<reports.length;i++){  
                 // console.log(`fiscal year end: ${data["annualReports"][i].fiscalDateEnding}`);  //0: most recent year
                 // console.log(`op cash flow: ${data["annualReports"][i].operatingCashflow}`);  
