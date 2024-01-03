@@ -53,9 +53,11 @@ export default class DiscountedCashFlowModel {
     #costOfEquity = 0.0;  //capital asset pricing model (capm)
     #discountRate = 0.0  //weighted average cost of capital (wacc)
     #terminalValue = 0.0  //perpetual growth model (pgm), perpetuity method
-    #futureFcf = [];
+
     #discountFactors = [];  //for net present value (npv)
+    #futureFcf = [];
     #discountedFcf = [];
+    
     #fairValue = 0.0;
     #fvAfterMarginOfSafety = 0.0;
 
@@ -74,12 +76,14 @@ export default class DiscountedCashFlowModel {
         this.#ticker = ticker;
         this.#source = source;
 
+        //FIXME: does not work on holiday: 2023-12-25
+        //https://www.npmjs.com/package/date-holidays#holiday-object
         if (date == ''){
             this.#curDate = this.#latestDate(new Date());  //default date      
         }
         else{  //XXX: date must be yyyy-mm-dd 
             this.#curDate = this.#latestDate(new Date(date + 'T09:31'));
-        }  //https://www.npmjs.com/package/date-holidays#holiday-object
+        }
 
         //TODO: validate params
 
@@ -151,8 +155,8 @@ export default class DiscountedCashFlowModel {
             return [1.0];
         }
 
-        for (let i=0; i<this.freeCashflows.length-1; i++){
-            if (this.freeCashflows[i] <= 0 && this.freeCashflows[i+1] <= 0){  //XXX: rethink algo; see ticker BA
+        for (let i=0; i<this.freeCashflows.length-1; i++){  //XXX: rethink algo; see ticker BA
+            if (this.freeCashflows[i] <= 0 && this.freeCashflows[i+1] <= 0){  
                 growthRates.push(0.0);  //cashflow yr/yr is neg=>neg
                 continue;
             }
