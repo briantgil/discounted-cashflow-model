@@ -139,29 +139,35 @@ export default class DiscountedCashFlowModel {
 
     get fcfGrowthRates(){
         //([i]-[i+1])/[i+1], if [i+1] == 0, then [i]
+        const growthRates = [];
 
-        if (this.freeCashflows.length <= 0){
+        if (this.freeCashflows.length <= 0){  //no cashflow history
             return [0.0];
         }
-        else if (this.freeCashflows.length == 1 && this.freeCashflows[0] <= 0) {
+        else if (this.freeCashflows.length == 1 && this.freeCashflows[0] <= 0) {  //only 1 yr cashflow history and it's neg
             return [0.0];
         }
-        else if (this.freeCashflows.length == 1 && this.freeCashflows[0] > 0){
+        else if (this.freeCashflows.length == 1 && this.freeCashflows[0] > 0){  //only 1 yr cashflow history and it's pos
             return [1.0];
         }
 
-        const growthRates = [];
         for (let i=0; i<this.freeCashflows.length-1; i++){
             if (this.freeCashflows[i] <= 0 && this.freeCashflows[i+1] <= 0){  //XXX: rethink algo; see ticker BA
-                growthRates.push(0.0);
+                growthRates.push(0.0);  //cashflow yr/yr is neg=>neg
                 continue;
             }
             else if (this.freeCashflows[i] > 0 && this.freeCashflows[i+1] <= 0) {
-                growthRates.push(1.0);
+                growthRates.push(1.0);  //cashflow yr/yr is neg=>pos
                 continue;                
             }
+            else if (this.freeCashflows[i] <= 0 && this.freeCashflows[i+1] > 0) {
+                growthRates.push(-1.0);  //cashflow yr/yr is pos=>neg
+                continue;                
+            }
+            //cash flow yr/yr is pos=>pos
             growthRates.push((this.freeCashflows[i] - this.freeCashflows[i+1]) / this.freeCashflows[i+1]);
         }
+
         return growthRates;
     }
 
@@ -210,6 +216,9 @@ average fcf growth: ${this.avgFcfGrowthRate}%
     }
 
     #latestDate(d){
+        //FIXME: does not work on holiday: 2023-12-25
+        //https://www.npmjs.com/package/date-holidays#holiday-object
+
         //consider previous day if before today's close
         if (`${d.getHours()<10?0:""}${d.getHours()}:${d.getMinutes()<10?0:""}${d.getMinutes()}` < '09:30'){
             d.setDate(d.getDate() - 1);
@@ -292,27 +301,6 @@ average fcf growth: ${this.avgFcfGrowthRate}%
 
     async #tickerData_AlphaVantage(ticker, apikey){
         const tickerSymbol = new TickerService(ticker, apikey);
-
-        /*sequential fetch data calls
-        let data = await ticker.lastClosePrice(this.curDate);
-        this.#closingPrice = data.close;
-
-        data = await ticker.shareAttributes();
-        this.#marketCap = parseInt(data["market cap"]);
-        this.#sharesOutstanding = parseInt(data.shares);
-        this.#beta = parseFloat(data.beta);        
-
-        data = await ticker.fromIncomeStmt();
-        this.#pretaxIncome = parseInt(data["pretax income"]);
-        this.#incomeTax = parseInt(data["income tax"]);
-        this.#interestExpense = parseInt(data["interest expense"]);
-
-        data = await ticker.fromBalSheet();
-        this.#totalDebt = parseInt(data["total debt"]);
-
-        data = await ticker.fromCashflowStmt();
-        this.#freeCashflows = data;
-        */
 
         const data = await Promise.all([
             tickerSymbol.lastClosePrice(this.curDate),
