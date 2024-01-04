@@ -1,12 +1,15 @@
 // @ts-check
 
-//https://medium.com/@trukrs/type-safe-javascript-with-jsdoc-7a2a63209b76
-//https://typescript-v2-140.ortam.vercel.app/docs/handbook/type-checking-javascript-files.html
-//https://jsdoc.app/tags-type
-
-
 import { dcfModelConfig, apiKeys } from './config.js';
 import TickerService from './ticker_service.js';
+
+/**
+ * @typedef {import('./config').ApiKeys} ApiKeys
+ */
+
+/**
+ * @typedef {import('./config.js').DcfModelConfig} DcfModelConfig
+ */
 
 export default class DiscountedCashFlowModel {
     /*
@@ -28,6 +31,9 @@ export default class DiscountedCashFlowModel {
      #terminalGrowthRate;
      #marginOfSafety;
      #durationYears;
+
+     /** @type {DcfModelConfig} */
+    #dcfConf = dcfModelConfig;
 
     /**
      * passed params
