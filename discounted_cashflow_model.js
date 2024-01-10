@@ -1,4 +1,3 @@
-// @ts-check
 
 import { dcfModelConfig, apiKeys } from './config.js';
 import TickerService from './ticker_service.js';
@@ -9,6 +8,10 @@ import TickerService from './ticker_service.js';
 
 /**
  * @typedef {import('./config.js').DcfModelConfig} DcfModelConfig
+ */
+
+/**
+ * @typedef {import('./ticker_service.js').TickerService} TickerService
  */
 
 export default class DiscountedCashFlowModel {
