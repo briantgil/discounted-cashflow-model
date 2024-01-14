@@ -135,6 +135,7 @@ export default class TickerService {
   /**
    *
    * @returns {Promise<number[] | undefined>}
+   * order is newest to oldest
    */
   async fromCashflowStmt() {
     const func = "CASH_FLOW";

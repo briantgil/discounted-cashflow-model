@@ -1,6 +1,10 @@
+// @ts-check
 
 import { dcfModelConfig, apiKeys } from './config.js';
 import TickerService from './ticker_service.js';
+import FileService from './file_service.js';
+import Holidays from 'date-holidays';  //https://www.npmjs.com/package/date-holidays#holiday-object
+
 
 /**
  * @typedef {import('./config').ApiKeys} ApiKeys
@@ -8,10 +12,6 @@ import TickerService from './ticker_service.js';
 
 /**
  * @typedef {import('./config.js').DcfModelConfig} DcfModelConfig
- */
-
-/**
- * @typedef {import('./ticker_service.js').TickerService} TickerService
  */
 
 export default class DiscountedCashFlowModel {
@@ -26,17 +26,10 @@ export default class DiscountedCashFlowModel {
     https://www.investopedia.com/terms/t/terminalvalue.asp
     */
 
-    /**
-     * global configs
-     */
-     #riskFreeRate;
-     #marketRate;
-     #terminalGrowthRate;
-     #marginOfSafety;
-     #durationYears;
-
-     /** @type {DcfModelConfig} */
-    #dcfConf = dcfModelConfig;
+     /** 
+      * global configs
+      * @type {DcfModelConfig} 
+      * */
 
     /**
      * passed params
@@ -44,6 +37,7 @@ export default class DiscountedCashFlowModel {
     #ticker;
     #source;
     #curDate;
+    #filepath
 
     /**
      * fetched data
@@ -80,20 +74,18 @@ export default class DiscountedCashFlowModel {
     /**
      * 
      * @param {string} ticker 
-     * @param {string} source 
-     * @param {string} date 
+     * @param {string} [source] 
+     * @param {string} [date] 
+     * @param {string} [filepath]
      */
-    constructor(ticker, source="AlphaVantage", date=''){
-        this.#riskFreeRate = dcfModelConfig.riskFreeRate;
-        this.#marketRate = dcfModelConfig.marketRate;
-        this.#terminalGrowthRate = dcfModelConfig.terminalGrowthRate;
-        this.#marginOfSafety = dcfModelConfig.marginOfSafety;
-        this.#durationYears = dcfModelConfig.durationYears;
+    constructor(ticker, source="AlphaVantage", date='', filepath=''){
         this.#ticker = ticker;
         this.#source = source;
+        this.#filepath = filepath;
+        
+        //TODO: validate params
 
-        //FIXME: does not work on holiday: 2023-12-25
-        //https://www.npmjs.com/package/date-holidays#holiday-object
+         //FIXME: does not work on holiday: 2023-12-25
         if (date == ''){
             this.#curDate = this.#latestDate(new Date());  //default date      
         }
@@ -101,25 +93,36 @@ export default class DiscountedCashFlowModel {
             this.#curDate = this.#latestDate(new Date(date + 'T09:31'));
         }
 
-        //TODO: validate params
+        const hd = new Holidays('US');
+        //if (!hd.isHoliday('2024-05-27 0:00:00 GMT-5:00')){
+        if (hd.isHoliday('2024-05-26 0:00:00 GMT-5:00') != false){
+            throw Error('Date must not be holiday')  //TODO: test date must not be weekend
+        }
+
+        if (source == 'file' && filepath == ''){  //TODO: use regex for upper/lower case
+            throw Error('Must enter filepath');  //TODO: test file exist
+        }
 
     }
+
 
     get riskFreeRate(){
-        return this.#riskFreeRate;
+        return dcfModelConfig.riskFreeRate;
     }
     get marketRate(){
-        return this.#marketRate;
+        return dcfModelConfig.marketRate;
     }
     get terminalGrowthRate(){
-        return this.#terminalGrowthRate;
+        return dcfModelConfig.terminalGrowthRate;
     }
     get marginOfSafety(){
-        return this.#marginOfSafety;
+        return dcfModelConfig.marginOfSafety;
     }
     get durationYears(){
-        return this.#durationYears;
+        return dcfModelConfig.durationYears;
     }    
+
+
     get ticker(){
         return this.#ticker;
     }    
@@ -129,6 +132,11 @@ export default class DiscountedCashFlowModel {
     get curDate(){
         return this.#curDate;
     }
+    get filepath(){
+        return this.#filepath;
+    }
+
+    
     get closingPrice(){
         return this.#closingPrice;
     }
@@ -156,6 +164,7 @@ export default class DiscountedCashFlowModel {
     get freeCashflows(){
         return this.#freeCashflows;
     }
+
 
     get fcfGrowthRates(){
         //([i]-[i+1])/[i+1], if [i+1] == 0, then [i]
@@ -191,12 +200,14 @@ export default class DiscountedCashFlowModel {
         return growthRates;
     }
 
+
     get avgFcfGrowthRate(){
         if (this.fcfGrowthRates.length > 0){
             return this.fcfGrowthRates.reduce((curTotal, curVal)=>curTotal+curVal) / this.fcfGrowthRates.length * 100; 
         }
         return 0.0;
     }
+
 
     toString(){
         return `
@@ -224,6 +235,7 @@ average fcf growth: ${this.avgFcfGrowthRate}%
 `;
     }
 
+
     testDates(){
         const dates = [new Date('2023-01-01T09:30'),new Date('2023-04-01T09:30'),new Date('2023-09-02T09:30'),new Date('2023-09-03T09:30'),new Date()];
         //FIXME: does not work on holiday: 2023-12-25
@@ -234,6 +246,7 @@ average fcf growth: ${this.avgFcfGrowthRate}%
             console.log(date);
         }
     }
+
 
     #latestDate(d){
         //FIXME: does not work on holiday: 2023-12-25
@@ -306,9 +319,12 @@ average fcf growth: ${this.avgFcfGrowthRate}%
         return `${year}-${month}-${date}`;
     }
 
+
     async fetchData(){
         switch (this.source){
             case 'file':
+                await this.#tickerData_File(this.#filepath);
+                break;
             case 'Polygon':
             case 'AlphaVantage':
                 await this.#tickerData_AlphaVantage(this.ticker, apiKeys.av);
@@ -318,6 +334,14 @@ average fcf growth: ${this.avgFcfGrowthRate}%
         }
         console.log(this.toString());
     }    
+
+
+    async #tickerData_File(path){
+        const tickerSymbol = new FileService(path);
+        const data = await tickerSymbol.parseFile();
+        //TODO: set data
+    }
+
 
     async #tickerData_AlphaVantage(ticker, apikey){
         const tickerSymbol = new TickerService(ticker, apikey);
