@@ -5,7 +5,6 @@ import TickerService from './ticker_service.js';
 import FileService from './file_service.js';
 import Holidays from 'date-holidays';  //https://www.npmjs.com/package/date-holidays#holiday-object
 
-
 /**
  * @typedef {import('./config').ApiKeys} ApiKeys
  */
@@ -28,7 +27,6 @@ export default class DiscountedCashFlowModel {
 
      /** 
       * global configs
-      * @type {DcfModelConfig} 
       * */
 
     /**
@@ -36,8 +34,8 @@ export default class DiscountedCashFlowModel {
      */
     #ticker;
     #source;
-    #curDate;
-    #filepath
+    #curDatePart;
+    #filePath
 
     /**
      * fetched data
@@ -75,34 +73,49 @@ export default class DiscountedCashFlowModel {
      * 
      * @param {string} ticker 
      * @param {string} [source] 
-     * @param {string} [date] 
+     * @param {string} [datepart] 
      * @param {string} [filepath]
      */
-    constructor(ticker, source="AlphaVantage", date='', filepath=''){
+    constructor(ticker, source="AlphaVantage", datepart='', filepath=''){
         this.#ticker = ticker;
         this.#source = source;
-        this.#filepath = filepath;
+        this.#filePath = filepath;
         
+        const hd = new Holidays('US');
+
         //TODO: validate params
 
-         //FIXME: does not work on holiday: 2023-12-25
-        if (date == ''){
-            this.#curDate = this.#latestDate(new Date());  //default date      
+        let nowDT = new Date(Date.now());
+        let curDT;
+        if (datepart == ''){
+            curDT = nowDT;
         }
-        else{  //XXX: date must be yyyy-mm-dd 
-            this.#curDate = this.#latestDate(new Date(date + 'T09:31'));
+        else {
+            curDT = new Date(`${datepart} ${nowDT.getHours()}:${nowDT.getMinutes()}:${nowDT.getSeconds()}`);  //GMT-5:00
         }
 
-        const hd = new Holidays('US');
-        //if (!hd.isHoliday('2024-05-27 0:00:00 GMT-5:00')){
-        if (hd.isHoliday('2024-05-26 0:00:00 GMT-5:00') != false){
-            throw Error('Date must not be holiday')  //TODO: test date must not be weekend
+        console.log("DEBUGGING DATE 1=" + curDT);
+
+        if (curDT.toString() == 'Invalid Date') {
+            throw Error(`Date '${datepart}' must be of format: yyyy-mm-dd`);
         }
+
+        if (!this.#isBusinessDay(curDT, hd)){throw Error(`Date '${curDT}' must be a business day`);}
+
+        if (!this.#isDateInPast(curDT)){throw Error(`Date '${curDT}' must have a market close`);}
+
+        //convert date back to yyyy-mm-dd string
+        let year = curDT.getFullYear();
+        let month = curDT.getMonth() + 1 < 10 ? "0" + (curDT.getMonth() + 1).toString() : curDT.getMonth().toString();
+        let day = curDT.getDate() < 10 ? "0" + curDT.getDate().toString() : curDT.getDate().toString();
+        this.#curDatePart = `${year}-${month}-${day}`;
 
         if (source == 'file' && filepath == ''){  //TODO: use regex for upper/lower case
             throw Error('Must enter filepath');  //TODO: test file exist
         }
 
+        console.log("DEBUGGING DATE 2=" + curDT);
+        
     }
 
 
@@ -129,11 +142,11 @@ export default class DiscountedCashFlowModel {
     get source(){
         return this.#source;
     }
-    get curDate(){
-        return this.#curDate;
+    get curDatePart(){
+        return this.#curDatePart;
     }
-    get filepath(){
-        return this.#filepath;
+    get filePath(){
+        return this.#filePath;
     }
 
     
@@ -219,7 +232,7 @@ terminal growth rate: ${this.terminalGrowthRate} (${(this.terminalGrowthRate * 1
 margin of safety:     ${this.marginOfSafety} (${(this.marginOfSafety * 100).toFixed(0)}%)
 duration years:       ${this.durationYears}
 
-${this.ticker} (source: ${this.source}, ${this.curDate})
+${this.ticker} (source: ${this.source}, ${this.curDatePart})
 -----------------------------------------
 last close:         ${this.closingPrice}
 market cap:         ${this.marketCap}
@@ -236,101 +249,75 @@ average fcf growth: ${this.avgFcfGrowthRate}%
     }
 
 
-    testDates(){
-        const dates = [new Date('2023-01-01T09:30'),new Date('2023-04-01T09:30'),new Date('2023-09-02T09:30'),new Date('2023-09-03T09:30'),new Date()];
-        //FIXME: does not work on holiday: 2023-12-25
-        //https://www.npmjs.com/package/date-holidays#holiday-object
-        for (let d in dates){
-            console.log(dates[d]);
-            let date = this.#latestDate(dates[d]);
-            console.log(date);
+    /**
+     * 
+     * @param {Date} date 
+     * @param {Holidays} hd
+     * @returns {boolean}
+     */
+    #isBusinessDay(date, hd){
+    //function isBusinessDay(date){
+        //const hd = new Holidays('US');
+        let day = date.getDay();
+
+        //weekends
+        if (day == 0 || day == 6){
+            return false;
         }
+        //holidays
+        if (typeof hd.isHoliday(date) == 'object'){
+            return false;
+        }
+        return true;
     }
 
 
-    #latestDate(d){
-        //FIXME: does not work on holiday: 2023-12-25
-        //https://www.npmjs.com/package/date-holidays#holiday-object
+    /**
+     * 
+     * @param {Date} date 
+     * @returns {boolean}
+     */
+    #isDateInPast(date){
+    //function isDateInPast(date){
+        /**
+         * compare dates
+         */
+        let dy = date.getFullYear();
+        let dm = date.getMonth() + 1 < 10 ? "0" + (date.getMonth() + 1).toString() : date.getMonth().toString();
+        let dd = date.getDate() < 10 ? '0' + date.getDate().toString() : date.getDate().toString();
+        let today = new Date();
+        today.setHours(16);  //market close
+        today.setMinutes(0);
+        today.setSeconds(0);
+        let ty = today.getFullYear();
+        let tm = today.getMonth() + 1 < 10 ? "0" + (today.getMonth() + 1).toString() : today.getMonth().toString();
+        let td = today.getDate() < 10 ? '0' + today.getDate().toString() : today.getDate().toString();
 
-        //consider previous day if before today's close
-        if (`${d.getHours()<10?0:""}${d.getHours()}:${d.getMinutes()<10?0:""}${d.getMinutes()}` < '09:30'){
-            d.setDate(d.getDate() - 1);
-        }  
-
-        let day = d.getDay();
-        let date = d.getDate();  //gets local date
-        let month = d.getMonth() + 1;
-        let year = d.getFullYear();
-
-        //remove weekends
-        if (day == 6){
-            date--;
+        //if date part > today date part
+        if (`${dy}-${dm}-${dd}` > `${ty}-${tm}-${td}`){
+            return false;
         }
-        else if (day == 0){
-            date = date - 2;
-        }
-
-        //adjust date 
-        if (date < 1){
-            month--;
-            if (month < 1){
-                month = 12;
-                year--
-            }
-
-            if ([1,3,5,7,8,10,12].indexOf(month) >= 0){
-                date = 31;
-            }
-            else if ([4,6,9,11].indexOf(month) >= 0){
-                date = 30;
-            }
-            else if (month == 2) {
-                //years 1700, 1800, and 1900 were not leap years 
-                //but the years 1600 and 2000 were
-                if (year % 4 == 0) {
-                    if (year % 100 == 0){
-                        if (year % 400 == 0){
-                            date = 29;  //leap year                   
-                        } else {
-                            date = 28;
-                        }
-                    } else {
-                        date = 29;  //leap year
-                    }
-                } else {
-                    date = 28;
-                }
+        //if date part == today date part and time part < 4PM (market close)
+        if (dy==ty && dm==tm && dd==td){
+            if (date.getTime() < today.getTime()){
+                return false;
             }
         }
-
-        //pad date
-        date = date.toString();
-        if (date.length == 1){
-            date = "0" + date;
-        }
-
-        //pad month
-        month = month.toString();
-        if (month.length == 1){
-            month = "0" + month;
-        }
-
-        //console.log(`***debugging: ${year}-${month}-${date}`);
-        return `${year}-${month}-${date}`;
+        return true;
     }
 
 
     async fetchData(){
         switch (this.source){
             case 'file':
-                await this.#tickerData_File(this.#filepath);
+                await this.#tickerData_File(this.#filePath);
                 break;
             case 'Polygon':
             case 'AlphaVantage':
-                await this.#tickerData_AlphaVantage(this.ticker, apiKeys.av);
+                await this.#tickerData_AlphaVantage(this.ticker, apiKeys.av, this.#curDatePart);
                 break;
             default:
-                await this.#tickerData_AlphaVantage(this.ticker, apiKeys.av);
+                await this.#tickerData_AlphaVantage(this.ticker, apiKeys.av, this.#curDatePart);
         }
         console.log(this.toString());
     }    
@@ -343,17 +330,19 @@ average fcf growth: ${this.avgFcfGrowthRate}%
     }
 
 
-    async #tickerData_AlphaVantage(ticker, apikey){
+    async #tickerData_AlphaVantage(ticker, apikey, date){
         const tickerSymbol = new TickerService(ticker, apikey);
 
         const data = await Promise.all([
-            tickerSymbol.lastClosePrice(this.curDate),
+            //tickerSymbol.lastClosePrice(this.#curDate),
+            tickerSymbol.lastClosePrice(date),
             tickerSymbol.shareAttributes(),
             tickerSymbol.fromIncomeStmt(),
             tickerSymbol.fromBalSheet(),
             tickerSymbol.fromCashflowStmt()
         ]);
 
+        
         //func 1
         this.#closingPrice = data[0].close;
         //func 2
@@ -368,6 +357,7 @@ average fcf growth: ${this.avgFcfGrowthRate}%
         this.#totalDebt = parseInt(data[3]["total debt"]);
         //func 5
         this.#freeCashflows = data[4].map(val => parseInt(val) > 0 ? parseInt(val) : 0);  //XXX: remove negatives; may cause div/0
+        
     }
 
 }

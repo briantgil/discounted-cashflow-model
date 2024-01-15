@@ -15,10 +15,10 @@ export default class TickerService {
 
   /**
    *
-   * @param {string} date
+   * @param {string} datePart
    * @returns {Promise<{close: string} | undefined>}
    */
-  async lastClosePrice(date) {
+  async lastClosePrice(datePart) {
     const func = "TIME_SERIES_DAILY";
     let url = this.baseUrl + func;
     try {
@@ -28,14 +28,14 @@ export default class TickerService {
       }
 
       /** @type {any}*/ const data = await response.json();
-      if (data["Time Series (Daily)"][date] == undefined) {
+      if (data["Time Series (Daily)"][datePart] == undefined) {
         throw new RangeError();
       }
-      return { close: data["Time Series (Daily)"][date]["4. close"] };
+      return { close: data["Time Series (Daily)"][datePart]["4. close"] };
 
     } catch (err) {
       if (err instanceof RangeError) {
-        console.log(`DATE '${date}' does not exist.`);
+        console.log(`DATE '${datePart}' does not exist.`);
       } else {
         console.error(err);
       }
