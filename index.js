@@ -10,9 +10,9 @@ import DiscountedCashFlowModel from './discounted_cashflow_model.js';
 
 //const dcfm = new DiscountedCashFlowModel("ba", '', '');//, undefined, '2023-12-26');
 
-const dcfm = new DiscountedCashFlowModel("MSFT", undefined, '2024-01-12');
+const dcfm = new DiscountedCashFlowModel("MSFT", undefined, '2024-01-11');
 //const dcfm = new DiscountedCashFlowModel("MSFT");
 
-
+//const dcfm = new DiscountedCashFlowModel("MTB", 'file', '2024-01-11', './company_data.txt');  //FIXME: issue with await
 await dcfm.fetchData();
 

@@ -1,0 +1,11 @@
+market_cap:22,660,000
+shares:165,960
+beta:0.86
+pretax_income:4,003,623
+income_tax:979,252
+total_debt:3,964,537
+interest_ex:0
+free_cash_flows:["4,359,352", "2,565,746","616,898","2,179,506"]
+
+
+

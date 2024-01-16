@@ -3,6 +3,9 @@
 import fs from "fs";
 
 export default class FileService {
+
+  /**@type {string}*/ file;
+
   /**
    *
    * @param {string} filepath
@@ -12,27 +15,24 @@ export default class FileService {
   }
 
   /**
-   *
-   * @returns {Object}
+   * @typedef {Object} TickerData
+   * @property {string} close
+   * @property {string} market_cap
+   * @property {string} shares
+   * @property {string} beta
+   * @property {string} pretax_income
+   * @property {string} income_tax
+   * @property {string} interest_expense
+   * @property {string} total_debt
+   * @property {string[]} free_cash_flows //order is newest to oldest
+   * @returns {Promise<TickerData>}
    */
-  parseFile() {
-    /**
-     * @typedef {Object} tickerData
-     * @property {string} market_cap
-     * @property {string} outstanding_shares
-     * @property {string} beta
-     * @property {string} pretax_income
-     * @property {string} income_tax
-     * @property {string} total_debt
-     * @property {string} interest_expense
-     * @property {string[]} free_cash_flows //order is newest to oldest
-     * @property {string} ticker
-     * @property {string} date
-     */
-    const tickerData = {};
+  async parseFile() {
+    /**@type {Object}*/ const tickerData = {};
 
     //file has colon-separated key-value pair per line 
-    fs.readFile(this.file, "utf-8", (err, data) => {
+    await fs.readFile(this.file, "utf-8", (err, data) => {
+      if (err) throw err;  //throw error if file does not exist
       data
         .trim()
         .split("\n")
@@ -40,9 +40,10 @@ export default class FileService {
           let [k, v] = line.split(":");
           //console.log(`${k}-${v}`);
           tickerData[k] = v;
+          //console.log(tickerData);
         });
     });
-
-    return tickerData;
+    console.log(tickerData);
+    return tickerData;  //FIXME: issue with await, maybe use readFileSync
   }
 }

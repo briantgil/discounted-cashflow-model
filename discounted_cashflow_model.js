@@ -1,7 +1,7 @@
 // @ts-check
 
 import { dcfModelConfig, apiKeys } from './config.js';
-import TickerService from './ticker_service.js';
+import AlphaVantageService from './ticker_service.js';
 import FileService from './file_service.js';
 import Holidays from 'date-holidays';  //https://www.npmjs.com/package/date-holidays#holiday-object
 
@@ -15,59 +15,49 @@ import Holidays from 'date-holidays';  //https://www.npmjs.com/package/date-holi
 
 export default class DiscountedCashFlowModel {
     /*
-    Discounted Cash Flow (DCF) model
-    Calculate Fair Value of a Company Security using Discounted Free Cash Flow
-    references:
-    https://www.investopedia.com/terms/d/dcf.asp#:~:text=Discounted%20cash%20flow%20(DCF)%20refers,will%20generate%20in%20the%20future.
-    https://www.investopedia.com/terms/w/wacc.asp
-    https://www.investopedia.com/terms/c/costofequity.asp
-    https://www.investopedia.com/terms/c/capm.asp
-    https://www.investopedia.com/terms/t/terminalvalue.asp
+        Discounted Cash Flow (DCF) model
+        Calculate Fair Value of a Company Security using Discounted Free Cash Flow
+        references:
+        https://www.investopedia.com/terms/d/dcf.asp#:~:text=Discounted%20cash%20flow%20(DCF)%20refers,will%20generate%20in%20the%20future.
+        https://www.investopedia.com/terms/w/wacc.asp
+        https://www.investopedia.com/terms/c/costofequity.asp
+        https://www.investopedia.com/terms/c/capm.asp
+        https://www.investopedia.com/terms/t/terminalvalue.asp
     */
 
-     /** 
-      * global configs
-      * */
+    //constructor params
+    /**@type {string}*/ #ticker;
+    /**@type {string}*/ #source;
+    /**@type {string}*/ #datePart;
+    /**@type {string}*/ #filePath
 
-    /**
-     * passed params
-     */
-    #ticker;
-    #source;
-    #curDatePart;
-    #filePath
+    //fetched data
+    /**@type {number}*/ #closingPrice = 0.0;
+    /**@type {number}*/ #marketCap = 0;
+    /**@type {number}*/ #sharesOutstanding = 0;  
+    /**@type {number}*/ #beta = 0.0;
+    /**@type {number}*/ #pretaxIncome = 0;  //if income<0, income=0
+    /**@type {number}*/ #incomeTax = 0;  //if tax<0, tax=0
+    /**@type {number}*/ #totalDebt = 0;  //use total debt for WACC; use total debt and assets for debt ratio
+    /**@type {number}*/ #interestExpense = 0;  //if nii>0, interest=0
+    /**@type {number[]}*/ #freeCashflows = [];  //if fcf<0, fcf=0; order: newest -> oldest; fcf=operating cash flow-capex (premises, equipment, and leased equipment)
 
-    /**
-     * fetched data
-     */
-    #closingPrice = 0.0;
-    #marketCap = 0;
-    #sharesOutstanding = 0;  
-    #beta = 0.0;
-    #pretaxIncome = 0;  //if income<0, income=0
-    #incomeTax = 0;  //if tax<0, tax=0
-    #totalDebt = 0;  //use total debt for WACC; use total debt and assets for debt ratio
-    #interestExpense = 0;  //if nii>0, interest=0
-    #freeCashflows = [];  //if fcf<0, fcf=0; order: newest -> oldest; fcf=operating cash flow-capex (premises, equipment, and leased equipment)
+    //calculated data
+    /**@type {number[]}*/ #fcfGrowthRates = [];
+    /**@type {number}*/ #avgFcfGrowthRate = 0.0;
 
-    /**
-     * calculated data
-     */
-    #fcfGrowthRates = [];
-    #avgFcfGrowthRate = 0.0;
+    /**@type {number}*/ #taxRate = 0.0;
+    /**@type {number}*/ #costOfDebt = 0.0;
+    /**@type {number}*/ #costOfEquity = 0.0;  //capital asset pricing model (capm)
+    /**@type {number}*/ #discountRate = 0.0  //weighted average cost of capital (wacc)
+    /**@type {number}*/ #terminalValue = 0.0  //perpetual growth model (pgm), perpetuity method
 
-    #taxRate = 0.0;
-    #costOfDebt = 0.0;
-    #costOfEquity = 0.0;  //capital asset pricing model (capm)
-    #discountRate = 0.0  //weighted average cost of capital (wacc)
-    #terminalValue = 0.0  //perpetual growth model (pgm), perpetuity method
-
-    #discountFactors = [];  //for net present value (npv)
-    #futureFcf = [];
-    #discountedFcf = [];
+    /**@type {number[]}*/#discountFactors = [];  //for net present value (npv)
+    /**@type {number[]}*/#futureFcf = [];
+    /**@type {number[]}*/#discountedFcf = [];
     
-    #fairValue = 0.0;
-    #fvAfterMarginOfSafety = 0.0;
+    /**@type {number}*/ #fairValue = 0.0;
+    /**@type {number}*/ #fvAfterMarginOfSafety = 0.0;
 
     /**
      * 
@@ -80,42 +70,39 @@ export default class DiscountedCashFlowModel {
         this.#ticker = ticker;
         this.#source = source;
         this.#filePath = filepath;
-        
         const hd = new Holidays('US');
 
-        //TODO: validate params
+        //validate ticker - see TickerService fetch
+        //validate source - see fetchData switch
 
-        let nowDT = new Date(Date.now());
-        let curDT;
-        if (datepart == ''){
+        //validate date
+        /**@type {Date}*/let nowDT = new Date(Date.now());
+        /**@type {Date}*/let curDT;
+        if (datepart.trim() == ''){
             curDT = nowDT;
         }
         else {
             curDT = new Date(`${datepart} ${nowDT.getHours()}:${nowDT.getMinutes()}:${nowDT.getSeconds()}`);  //GMT-5:00
         }
 
-        console.log("DEBUGGING DATE 1=" + curDT);
-
-        if (curDT.toString() == 'Invalid Date') {
-            throw Error(`Date '${datepart}' must be of format: yyyy-mm-dd`);
-        }
-
+        //TODO: disregard if source=file
+        if (curDT.toString() == 'Invalid Date') {throw Error(`Date '${datepart}' must be of format: yyyy-mm-dd`);}
         if (!this.#isBusinessDay(curDT, hd)){throw Error(`Date '${curDT}' must be a business day`);}
-
         if (!this.#isDateInPast(curDT)){throw Error(`Date '${curDT}' must have a market close`);}
 
         //convert date back to yyyy-mm-dd string
-        let year = curDT.getFullYear();
-        let month = curDT.getMonth() + 1 < 10 ? "0" + (curDT.getMonth() + 1).toString() : curDT.getMonth().toString();
-        let day = curDT.getDate() < 10 ? "0" + curDT.getDate().toString() : curDT.getDate().toString();
-        this.#curDatePart = `${year}-${month}-${day}`;
+        /**@type {number}*/ let year = curDT.getFullYear();
+        /**@type {string}*/ let month = curDT.getMonth() + 1 < 10 ? "0" + (curDT.getMonth() + 1).toString() : curDT.getMonth().toString();
+        /**@type {string}*/ let day = curDT.getDate() < 10 ? "0" + curDT.getDate().toString() : curDT.getDate().toString();
+        this.#datePart = `${year}-${month}-${day}`;
 
-        if (source == 'file' && filepath == ''){  //TODO: use regex for upper/lower case
-            throw Error('Must enter filepath');  //TODO: test file exist
+        //validate file
+        //test file exist - see FileService readFile
+        /**@type {RegExp}*/ let pattern = /^file$/i
+        if (pattern.test(source) && filepath.trim() == ''){  //TODO?: set source="file"
+            throw Error('Must enter filepath');  
         }
 
-        console.log("DEBUGGING DATE 2=" + curDT);
-        
     }
 
 
@@ -142,8 +129,8 @@ export default class DiscountedCashFlowModel {
     get source(){
         return this.#source;
     }
-    get curDatePart(){
-        return this.#curDatePart;
+    get datePart(){
+        return this.#datePart;
     }
     get filePath(){
         return this.#filePath;
@@ -232,7 +219,7 @@ terminal growth rate: ${this.terminalGrowthRate} (${(this.terminalGrowthRate * 1
 margin of safety:     ${this.marginOfSafety} (${(this.marginOfSafety * 100).toFixed(0)}%)
 duration years:       ${this.durationYears}
 
-${this.ticker} (source: ${this.source}, ${this.curDatePart})
+${this.ticker} (source: ${this.source}, ${this.datePart})
 -----------------------------------------
 last close:         ${this.closingPrice}
 market cap:         ${this.marketCap}
@@ -310,31 +297,43 @@ average fcf growth: ${this.avgFcfGrowthRate}%
     async fetchData(){
         switch (this.source){
             case 'file':
-                await this.#tickerData_File(this.#filePath);
+                this.#tickerData_File(this.#filePath);
                 break;
             case 'Polygon':
             case 'AlphaVantage':
-                await this.#tickerData_AlphaVantage(this.ticker, apiKeys.av, this.#curDatePart);
+                await this.#tickerData(new AlphaVantageService(this.ticker, apiKeys.av, this.#datePart));                
                 break;
             default:
-                await this.#tickerData_AlphaVantage(this.ticker, apiKeys.av, this.#curDatePart);
+                await this.#tickerData_AlphaVantage(this.ticker, apiKeys.av, this.#datePart);
         }
         console.log(this.toString());
     }    
 
-
     async #tickerData_File(path){
         const tickerSymbol = new FileService(path);
         const data = await tickerSymbol.parseFile();
-        //TODO: set data
+        console.log(data);
     }
 
+    async #tickerData(ticker){
+        const data = await ticker.fetchAllData();
+        console.log(data);
+
+        this.#closingPrice = parseFloat(data.close);
+        this.#marketCap = parseInt(data.market_cap);
+        this.#sharesOutstanding = parseInt(data.shares);
+        this.#beta = parseFloat(data.beta);   
+        this.#pretaxIncome = parseInt(data.pretax_income) > 0 ? parseInt(data.pretax_income) : 0;
+        this.#incomeTax = parseInt(data.income_tax) > 0 ? parseInt(data.income_tax) : 0;
+        this.#interestExpense = parseInt(data.interest_expense) > 0 ? parseInt(data.interest_expense) : 0;
+        this.#totalDebt = parseInt(data.total_debt);
+        this.#freeCashflows = data.free_cash_flows.map(val => parseInt(val) > 0 ? parseInt(val) : 0);  //XXX: remove negatives; may cause div/0
+    }
 
     async #tickerData_AlphaVantage(ticker, apikey, date){
-        const tickerSymbol = new TickerService(ticker, apikey);
+        const tickerSymbol = new AlphaVantageService(ticker, apikey, date);
 
         const data = await Promise.all([
-            //tickerSymbol.lastClosePrice(this.#curDate),
             tickerSymbol.lastClosePrice(date),
             tickerSymbol.shareAttributes(),
             tickerSymbol.fromIncomeStmt(),
@@ -342,19 +341,18 @@ average fcf growth: ${this.avgFcfGrowthRate}%
             tickerSymbol.fromCashflowStmt()
         ]);
 
-        
         //func 1
-        this.#closingPrice = data[0].close;
+        this.#closingPrice = parseFloat(data[0].close);
         //func 2
-        this.#marketCap = parseInt(data[1]["market cap"]);
+        this.#marketCap = parseInt(data[1].market_cap);
         this.#sharesOutstanding = parseInt(data[1].shares);
         this.#beta = parseFloat(data[1].beta);   
         //func 3
-        this.#pretaxIncome = parseInt(data[2]["pretax income"]) > 0 ? parseInt(data[2]["pretax income"]) : 0;
-        this.#incomeTax = parseInt(data[2]["income tax"]) > 0 ? parseInt(data[2]["income tax"]) : 0;
-        this.#interestExpense = parseInt(data[2]["interest expense"]) > 0 ? parseInt(data[2]["interest expense"]) : 0;
+        this.#pretaxIncome = parseInt(data[2].pretax_income) > 0 ? parseInt(data[2].pretax_income) : 0;
+        this.#incomeTax = parseInt(data[2].income_tax) > 0 ? parseInt(data[2].income_tax) : 0;
+        this.#interestExpense = parseInt(data[2].interest_expense) > 0 ? parseInt(data[2].interest_expense) : 0;
         //func 4
-        this.#totalDebt = parseInt(data[3]["total debt"]);
+        this.#totalDebt = parseInt(data[3].total_debt);
         //func 5
         this.#freeCashflows = data[4].map(val => parseInt(val) > 0 ? parseInt(val) : 0);  //XXX: remove negatives; may cause div/0
         
