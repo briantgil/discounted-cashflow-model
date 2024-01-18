@@ -27,23 +27,32 @@ export default class FileService {
    * @property {string[]} free_cash_flows //order is newest to oldest
    * @returns {Promise<TickerData>}
    */
-  async parseFile() {
+  async fetchAllData() {
     /**@type {Object}*/ const tickerData = {};
 
-    //file has colon-separated key-value pair per line 
-    await fs.readFile(this.file, "utf-8", (err, data) => {
-      if (err) throw err;  //throw error if file does not exist
-      data
+    try {
+      //file has colon-separated key-value pair per line 
+      const result = await fs.promises.readFile(this.file, "utf-8");
+            
+      result
         .trim()
         .split("\n")
         .forEach((line) => {
           let [k, v] = line.split(":");
           //console.log(`${k}-${v}`);
-          tickerData[k] = v;
+          tickerData[k] = v.replaceAll(",", "").replace("\r", "");  
+          if (k == 'free_cash_flows'){
+            tickerData[k] = tickerData[k].split(" ");  //string[]
+          }
           //console.log(tickerData);
         });
-    });
-    console.log(tickerData);
-    return tickerData;  //FIXME: issue with await, maybe use readFileSync
+    
+      //console.log(tickerData);
+      return tickerData;  
+    }
+    catch (err){
+      throw Error(err);      
+    }   
   }
+
 }

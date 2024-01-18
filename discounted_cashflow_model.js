@@ -297,9 +297,11 @@ average fcf growth: ${this.avgFcfGrowthRate}%
     async fetchData(){
         switch (this.source){
             case 'file':
-                this.#tickerData_File(this.#filePath);
+                //await this.#tickerData_File(this.#filePath);
+                await this.#tickerData(new FileService(this.#filePath));
                 break;
             case 'Polygon':
+                throw Error(`Source '${this.source}' Not implemented`);
             case 'AlphaVantage':
                 await this.#tickerData(new AlphaVantageService(this.ticker, apiKeys.av, this.#datePart));                
                 break;
@@ -309,15 +311,27 @@ average fcf growth: ${this.avgFcfGrowthRate}%
         console.log(this.toString());
     }    
 
-    async #tickerData_File(path){
-        const tickerSymbol = new FileService(path);
-        const data = await tickerSymbol.parseFile();
-        console.log(data);
+    async #tickerData_File(ticker){
+    //async #tickerData_File(path){
+        //const tickerSymbol = new FileService(path);
+        //const data = await tickerSymbol.parseFile();
+        const data = await ticker.fetchAllData();        
+        //console.log(data);
+
+        this.#closingPrice = parseFloat(data.close);
+        this.#marketCap = parseInt(data.market_cap);
+        this.#sharesOutstanding = parseInt(data.shares);
+        this.#beta = parseFloat(data.beta);   
+        this.#pretaxIncome = parseInt(data.pretax_income) > 0 ? parseInt(data.pretax_income) : 0;
+        this.#incomeTax = parseInt(data.income_tax) > 0 ? parseInt(data.income_tax) : 0;
+        this.#interestExpense = parseInt(data.interest_expense) > 0 ? parseInt(data.interest_expense) : 0;
+        this.#totalDebt = parseInt(data.total_debt);
+        this.#freeCashflows = data.free_cash_flows.map(val => parseInt(val) > 0 ? parseInt(val) : 0);  //XXX: remove negatives; may cause div/0
     }
 
     async #tickerData(ticker){
         const data = await ticker.fetchAllData();
-        console.log(data);
+        //console.log(data);
 
         this.#closingPrice = parseFloat(data.close);
         this.#marketCap = parseInt(data.market_cap);
