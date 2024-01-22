@@ -32,7 +32,7 @@ export default class FileService {
 
     try {
       //file has colon-separated key-value pair per line 
-      const result = await fs.promises.readFile(this.file, "utf-8");
+      const result = await fs.promises.readFile(this.file, "utf-8");  //TODO: close file?
             
       result
         .trim()

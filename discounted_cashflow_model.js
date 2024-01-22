@@ -300,8 +300,10 @@ average fcf growth: ${this.avgFcfGrowthRate}%
                 //await this.#tickerData_File(this.#filePath);
                 await this.#tickerData(new FileService(this.#filePath));
                 break;
+            case 'YahooFinance':
             case 'Polygon':
                 throw Error(`Source '${this.source}' Not implemented`);
+                break;
             case 'AlphaVantage':
                 await this.#tickerData(new AlphaVantageService(this.ticker, apiKeys.av, this.#datePart));                
                 break;
